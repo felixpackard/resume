@@ -1,28 +1,36 @@
 use anyhow::Context;
 use image::{imageops::FilterType, DynamicImage, GenericImageView, Pixel};
+use itertools::Itertools;
 use ratatui::{
     buffer::Buffer,
-    layout::{Constraint, Direction, Layout, Rect},
+    layout::{Constraint, Direction, Flex, Layout, Rect},
     style::{Color, Style, Stylize},
     text::{Line, Text},
     widgets::{Block, BorderType, List, Paragraph, Widget, Wrap},
     Frame,
 };
 
-use crate::{App, PageType};
+use crate::{App, PageType, Shortcut};
 
 const SIDEBAR_PADDING_LEFT: usize = 2;
 const CONTENT_PADDING_LEFT: usize = 3;
 const PADDING_VERTICAL: u16 = 1;
 
 pub fn draw(frame: &mut Frame, app: &mut App) {
+    let outer = Layout::default()
+        .direction(Direction::Vertical)
+        .constraints([Constraint::Min(1), Constraint::Length(1)].into_iter())
+        .split(frame.area());
+
     let layout = Layout::default()
         .direction(Direction::Horizontal)
         .constraints([Constraint::Percentage(20), Constraint::Min(20)].into_iter())
-        .split(frame.area());
+        .split(outer[0]);
 
     draw_sidebar(frame, layout[0], app).unwrap();
     draw_content(frame, layout[1], app).unwrap();
+
+    draw_status_bar(frame, outer[1], app).unwrap();
 }
 
 fn draw_sidebar(frame: &mut Frame, area: Rect, app: &mut App) -> anyhow::Result<()> {
@@ -69,6 +77,75 @@ fn draw_content(frame: &mut Frame, area: Rect, app: &mut App) -> anyhow::Result<
     };
 
     frame.render_widget(content, area);
+
+    Ok(())
+}
+
+fn draw_status_bar(frame: &mut Frame, area: Rect, app: &mut App) -> anyhow::Result<()> {
+    let bar = Block::default()
+        .style(Style::default().bg(Color::DarkGray))
+        .padding(ratatui::widgets::Padding {
+            left: 2,
+            right: 2,
+            top: 0,
+            bottom: 0,
+        });
+
+    draw_status_bar_shortcuts(
+        frame,
+        bar.inner(area),
+        StatusBarSide::Left,
+        vec![Shortcut::Quit],
+    )
+    .context("draw global shortcuts")?;
+
+    let content_shortcuts = match app.pages.state.selected() {
+        Some(selected) => app.pages.items[selected].shortcuts(),
+        None => vec![],
+    };
+
+    if !content_shortcuts.is_empty() {
+        draw_status_bar_shortcuts(
+            frame,
+            bar.inner(area),
+            StatusBarSide::Right,
+            content_shortcuts,
+        )
+        .context("draw content shortctus")?;
+    }
+
+    frame.render_widget(bar, area);
+
+    Ok(())
+}
+
+enum StatusBarSide {
+    Left,
+    Right,
+}
+
+fn draw_status_bar_shortcuts(
+    frame: &mut Frame,
+    area: Rect,
+    side: StatusBarSide,
+    shortcuts: Vec<Shortcut>,
+) -> anyhow::Result<()> {
+    let layout = Layout::horizontal(
+        shortcuts
+            .iter()
+            .map(|s| Constraint::Length(u16::try_from(s.label().width()).unwrap())),
+    )
+    .flex(match side {
+        StatusBarSide::Left => Flex::Start,
+        StatusBarSide::Right => Flex::End,
+    })
+    .spacing(2);
+
+    let areas = layout.split(area);
+    let areas = areas.iter().collect_vec();
+    for (shortcut, rect) in shortcuts.iter().zip(areas) {
+        frame.render_widget(shortcut.label(), *rect);
+    }
 
     Ok(())
 }

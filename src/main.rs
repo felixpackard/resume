@@ -4,6 +4,8 @@ use ::image::DynamicImage;
 use image::fetch_image;
 use ratatui::{
     crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
+    style::{Color, Style, Stylize},
+    text::{Line, Span},
     widgets::ListState,
     DefaultTerminal, Frame,
 };
@@ -74,6 +76,55 @@ impl PageType {
             Self::Portrait => "Surprise!",
         }
     }
+
+    fn shortcuts(&self) -> Vec<Shortcut> {
+        match self {
+            Self::Overview => vec![
+                Shortcut::OpenEmail,
+                Shortcut::OpenPhone,
+                Shortcut::OpenGithub,
+                Shortcut::OpenBluesky,
+                Shortcut::OpenTwitter,
+            ],
+            _ => vec![],
+        }
+    }
+}
+
+enum Shortcut {
+    Quit,
+    OpenEmail,
+    OpenPhone,
+    OpenGithub,
+    OpenBluesky,
+    OpenTwitter,
+}
+
+impl Shortcut {
+    fn label(&self) -> Line {
+        match self {
+            Self::Quit => shortcut_line("quit", 0),
+            Self::OpenEmail => shortcut_line("email", 0),
+            Self::OpenPhone => shortcut_line("phone", 0),
+            Self::OpenGithub => shortcut_line("github", 0),
+            Self::OpenBluesky => shortcut_line("bluesky", 0),
+            Self::OpenTwitter => shortcut_line("twitter", 0),
+        }
+    }
+}
+
+fn shortcut_line(label: &str, shortcut_offset: usize) -> Line {
+    Line::from(vec![
+        Span::styled(&label[..shortcut_offset], Style::default().fg(Color::Gray)),
+        Span::styled(
+            &label[shortcut_offset..shortcut_offset + 1],
+            Style::default().fg(Color::White).bold(),
+        ),
+        Span::styled(
+            &label[shortcut_offset + 1..],
+            Style::default().fg(Color::Gray),
+        ),
+    ])
 }
 
 #[derive(Debug, Default)]
