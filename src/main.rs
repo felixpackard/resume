@@ -53,6 +53,31 @@ impl From<ResumeSchema> for Resume {
     }
 }
 
+impl Resume {
+    fn get_email_url(&self) -> Option<String> {
+        Some(format!(
+            "mailto:{}",
+            self.data.basics.as_ref()?.email.as_ref()?
+        ))
+    }
+
+    fn get_phone_url(&self) -> Option<String> {
+        Some(format!(
+            "tel:{}",
+            self.data.basics.as_ref()?.phone.as_ref()?
+        ))
+    }
+
+    fn get_profile_url(&self, network: &str) -> Option<String> {
+        let profiles: &Vec<ResumeSchemaBasicsProfilesItem> =
+            self.data.basics.as_ref()?.profiles.as_ref();
+        let profile = profiles
+            .iter()
+            .find(|p| p.network.as_ref().map(|s| s.to_lowercase()).as_deref() == Some(network))?;
+        profile.url.clone()
+    }
+}
+
 #[derive(Debug, Clone, Copy)]
 enum PageType {
     Overview,
@@ -110,6 +135,35 @@ impl Shortcut {
             Self::OpenBluesky => shortcut_line("bluesky", 0),
             Self::OpenTwitter => shortcut_line("twitter", 0),
         }
+    }
+
+    fn key(&self) -> KeyCode {
+        match self {
+            Self::Quit => KeyCode::Char('q'),
+            Self::OpenEmail => KeyCode::Char('e'),
+            Self::OpenPhone => KeyCode::Char('p'),
+            Self::OpenGithub => KeyCode::Char('g'),
+            Self::OpenBluesky => KeyCode::Char('b'),
+            Self::OpenTwitter => KeyCode::Char('t'),
+        }
+    }
+
+    fn handle(&self, app: &mut App) -> std::io::Result<()> {
+        match self {
+            Self::OpenEmail => open_url(app.resume.get_email_url()),
+            Self::OpenPhone => open_url(app.resume.get_phone_url()),
+            Self::OpenGithub => open_url(app.resume.get_profile_url("github")),
+            Self::OpenBluesky => open_url(app.resume.get_profile_url("bluesky")),
+            Self::OpenTwitter => open_url(app.resume.get_profile_url("twitter")),
+            _ => Ok(()),
+        }
+    }
+}
+
+fn open_url(url_option: Option<String>) -> std::io::Result<()> {
+    match url_option {
+        Some(url) => open::that(&url),
+        None => Ok(()),
     }
 }
 
@@ -208,7 +262,17 @@ impl App {
             KeyCode::Char('q') | KeyCode::Esc => self.should_exit = true,
             KeyCode::Char('j') | KeyCode::Down => self.select_next(),
             KeyCode::Char('k') | KeyCode::Up => self.select_previous(),
-            _ => {}
+            _ => {
+                if let Some(selected) = self.pages.state.selected() {
+                    let current_page = self.pages.items[selected];
+                    let available_shortcuts = current_page.shortcuts();
+                    for shortcut in available_shortcuts {
+                        if key.code == shortcut.key() {
+                            shortcut.handle(self).unwrap();
+                        }
+                    }
+                }
+            }
         }
     }
 
