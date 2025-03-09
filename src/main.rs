@@ -1,14 +1,16 @@
-use std::io;
+use std::{fs::File, io, sync::Arc};
 
 use ::image::DynamicImage;
 use image::fetch_image;
 use ratatui::{
-    crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind},
+    crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
     style::{Color, Style, Stylize},
     text::{Line, Span},
     widgets::ListState,
     DefaultTerminal, Frame,
 };
+use tracing_subscriber::prelude::*;
+use tui_scrollview::ScrollViewState;
 
 pub mod image;
 pub mod json;
@@ -17,10 +19,21 @@ pub mod ui;
 include!(concat!(env!("OUT_DIR"), "/codegen.rs"));
 
 fn main() -> io::Result<()> {
+    init_logging();
     let mut terminal = ratatui::init();
     let app_result = App::default().run(&mut terminal);
     ratatui::restore();
     app_result
+}
+
+fn init_logging() {
+    let file = File::create("debug.log");
+    let file = match file {
+        Ok(file) => file,
+        Err(error) => panic!("Error: {:?}", error),
+    };
+    let debug_log = tracing_subscriber::fmt::layer().with_writer(Arc::new(file));
+    tracing_subscriber::registry().with(debug_log).init();
 }
 
 #[derive(Debug)]
@@ -28,6 +41,7 @@ pub struct App {
     should_exit: bool,
     resume: Resume,
     pages: Pages,
+    scroll_view_state: ScrollViewState,
 }
 
 #[derive(Debug)]
@@ -227,6 +241,7 @@ impl Default for App {
             should_exit: false,
             pages: Pages::from(&resume),
             resume: Resume::from(resume),
+            scroll_view_state: ScrollViewState::default(),
         }
     }
 }
@@ -260,8 +275,20 @@ impl App {
         }
         match key.code {
             KeyCode::Char('q') | KeyCode::Esc => self.should_exit = true,
-            KeyCode::Char('j') | KeyCode::Down => self.select_next(),
-            KeyCode::Char('k') | KeyCode::Up => self.select_previous(),
+            KeyCode::Char('j') | KeyCode::Down => {
+                if key.modifiers.contains(KeyModifiers::ALT) {
+                    self.scroll_view_state.scroll_down()
+                } else {
+                    self.select_next()
+                }
+            }
+            KeyCode::Char('k') | KeyCode::Up => {
+                if key.modifiers.contains(KeyModifiers::ALT) {
+                    self.scroll_view_state.scroll_up()
+                } else {
+                    self.select_previous()
+                }
+            }
             _ => {
                 if let Some(selected) = self.pages.state.selected() {
                     let current_page = self.pages.items[selected];

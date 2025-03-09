@@ -3,12 +3,13 @@ use image::{imageops::FilterType, DynamicImage, GenericImageView, Pixel};
 use itertools::Itertools;
 use ratatui::{
     buffer::Buffer,
-    layout::{Constraint, Direction, Flex, Layout, Rect},
+    layout::{Constraint, Direction, Flex, Layout, Rect, Size},
     style::{Color, Style, Stylize},
     text::{Line, Text},
-    widgets::{Block, BorderType, List, Paragraph, Widget, Wrap},
+    widgets::{Block, BorderType, List, Padding, Paragraph, Widget, Wrap},
     Frame,
 };
+use tui_scrollview::{ScrollView, ScrollViewState, ScrollbarVisibility};
 
 use crate::{App, PageType, Shortcut};
 
@@ -61,7 +62,8 @@ fn draw_content(frame: &mut Frame, area: Rect, app: &mut App) -> anyhow::Result<
             top: PADDING_VERTICAL,
             bottom: PADDING_VERTICAL,
         })
-        .title(format!("{}Content", "─".repeat(CONTENT_PADDING_LEFT)));
+        .title(format!("{}Content", "─".repeat(CONTENT_PADDING_LEFT)))
+        .title_bottom(" alt+j/↓, alt+k/↑ ");
 
     let selected = match app.pages.state.selected() {
         Some(selected) => selected,
@@ -204,9 +206,37 @@ fn draw_overview(frame: &mut Frame, area: Rect, app: &mut App) -> anyhow::Result
         }
     });
 
+    draw_scrollview(frame, area, &mut app.scroll_view_state, lines)?;
+
+    Ok(())
+}
+
+fn draw_scrollview(
+    frame: &mut Frame,
+    area: Rect,
+    scroll_view_state: &mut ScrollViewState,
+    lines: Vec<Line>,
+) -> anyhow::Result<()> {
     let text = Text::from(lines);
-    let paragraph = Paragraph::new(text).wrap(Wrap { trim: false });
-    frame.render_widget(paragraph, area);
+    let paragraph = Paragraph::new(text)
+        .wrap(Wrap { trim: true })
+        .block(Block::new().padding(Padding {
+            left: 0,
+            right: 2,
+            top: 0,
+            bottom: 0,
+        }));
+
+    let content_size = Size::new(area.width, u16::try_from(paragraph.line_count(area.width))?);
+    let mut scroll_view =
+        ScrollView::new(content_size).horizontal_scrollbar_visibility(ScrollbarVisibility::Never);
+
+    scroll_view.render_widget(
+        paragraph,
+        Rect::new(0, 0, content_size.width, content_size.height),
+    );
+
+    frame.render_stateful_widget(scroll_view, area, scroll_view_state);
 
     Ok(())
 }
