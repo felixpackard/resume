@@ -5,7 +5,7 @@ use ratatui::{
     buffer::Buffer,
     layout::{Constraint, Direction, Flex, Layout, Rect, Size},
     style::{Color, Style, Stylize},
-    text::{Line, Text},
+    text::{Line, Span, Text},
     widgets::{Block, BorderType, List, Padding, Paragraph, Widget, Wrap},
     Frame,
 };
@@ -16,6 +16,8 @@ use crate::{date::format_date_range, App, PageType, Shortcut};
 const SIDEBAR_PADDING_LEFT: usize = 2;
 const CONTENT_PADDING_LEFT: usize = 3;
 const PADDING_VERTICAL: u16 = 1;
+
+const DARK_GRAY: Color = Color::from_u32(0x002F343E);
 
 pub fn draw(frame: &mut Frame, app: &mut App) {
     let outer = Layout::default()
@@ -48,7 +50,7 @@ fn draw_sidebar(frame: &mut Frame, area: Rect, app: &mut App) -> anyhow::Result<
                 .title_bottom(" j/↓ k/↑ "),
         )
         .style(Style::new().white())
-        .highlight_style(Style::new().bold().bg(Color::DarkGray));
+        .highlight_style(Style::new().bold().bg(DARK_GRAY));
     frame.render_stateful_widget(list, area, &mut app.pages.state);
     Ok(())
 }
@@ -79,6 +81,9 @@ fn draw_content(frame: &mut Frame, area: Rect, app: &mut App) -> anyhow::Result<
         PageType::Education => {
             draw_education(frame, content.inner(area), app).context("failed to draw education")?
         }
+        PageType::Skills => {
+            draw_skills(frame, content.inner(area), app).context("failed to draw skills")?
+        }
         PageType::Portrait => draw_portrait(frame, content.inner(area), app)
             .context("failed to draw ascii portrait")?,
         _ => {}
@@ -91,7 +96,7 @@ fn draw_content(frame: &mut Frame, area: Rect, app: &mut App) -> anyhow::Result<
 
 fn draw_status_bar(frame: &mut Frame, area: Rect, app: &mut App) -> anyhow::Result<()> {
     let bar = Block::default()
-        .style(Style::default().bg(Color::DarkGray))
+        .style(Style::default().bg(DARK_GRAY))
         .padding(ratatui::widgets::Padding {
             left: 2,
             right: 2,
@@ -253,7 +258,7 @@ fn draw_work(frame: &mut Frame, area: Rect, app: &mut App) -> anyhow::Result<()>
         for highlight in &work_item.highlights {
             LineBuilder::new()
                 .prefix("• ")
-                .push(&mut lines, highlight)?;
+                .push_string(&mut lines, highlight)?;
         }
 
         LineBuilder::new().push_empty_line(&mut lines)?;
@@ -286,6 +291,30 @@ fn draw_education(frame: &mut Frame, area: Rect, app: &mut App) -> anyhow::Resul
         LineBuilder::new().push_if_some(&mut lines, &education_item.study_type)?;
 
         LineBuilder::new().push_empty_line(&mut lines)?;
+    }
+
+    draw_scrollview(frame, area, &mut app.scroll_view_state, lines)?;
+
+    Ok(())
+}
+
+fn draw_skills(frame: &mut Frame, area: Rect, app: &mut App) -> anyhow::Result<()> {
+    let mut lines = Vec::new();
+
+    for skill in app.resume.data.skills.iter() {
+        LineBuilder::new()
+            .bold()
+            .push_if_some(&mut lines, &skill.name)?;
+        LineBuilder::new().newline().push_line(
+            &mut lines,
+            #[allow(unstable_name_collisions)]
+            skill
+                .keywords
+                .iter()
+                .map(|skill| Span::from(skill).bg(DARK_GRAY))
+                .intersperse(Span::from(", "))
+                .collect::<Line>(),
+        )?;
     }
 
     draw_scrollview(frame, area, &mut app.scroll_view_state, lines)?;
@@ -367,9 +396,14 @@ impl LineBuilder {
         self
     }
 
-    fn push(self, lines: &mut Vec<Line>, value: &String) -> anyhow::Result<()> {
+    fn push_string(self, lines: &mut Vec<Line>, value: &String) -> anyhow::Result<()> {
         let line = Line::from(format!("{}{}", self.prefix, value)).style(self.style);
-        lines.push(line);
+        self.push_line(lines, line)?;
+        Ok(())
+    }
+
+    fn push_line<'a>(self, lines: &mut Vec<Line<'a>>, value: Line<'a>) -> anyhow::Result<()> {
+        lines.push(value);
         if self.push_newline {
             lines.push(Line::default());
         }
@@ -378,14 +412,14 @@ impl LineBuilder {
 
     fn push_if_some(self, lines: &mut Vec<Line>, opt: &Option<String>) -> anyhow::Result<()> {
         if let Some(value) = opt {
-            self.push(lines, value)?;
+            self.push_string(lines, value)?;
         }
         Ok(())
     }
 
     fn push_if_not_empty(self, lines: &mut Vec<Line>, value: &String) -> anyhow::Result<()> {
         if !value.is_empty() {
-            self.push(lines, value)?;
+            self.push_string(lines, value)?;
         }
         Ok(())
     }
