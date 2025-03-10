@@ -108,8 +108,8 @@ enum PageType {
     Work,
     Education,
     Skills,
-    Interests,
     Languages,
+    Interests,
     Portrait,
 }
 

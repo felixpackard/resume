@@ -84,6 +84,12 @@ fn draw_content(frame: &mut Frame, area: Rect, app: &mut App) -> anyhow::Result<
         PageType::Skills => {
             draw_skills(frame, content.inner(area), app).context("failed to draw skills")?
         }
+        PageType::Languages => {
+            draw_languages(frame, content.inner(area), app).context("failed to draw languages")?
+        }
+        PageType::Interests => {
+            draw_interests(frame, content.inner(area), app).context("failed to draw interests")?
+        }
         PageType::Portrait => draw_portrait(frame, content.inner(area), app)
             .context("failed to draw ascii portrait")?,
         _ => {}
@@ -309,6 +315,46 @@ fn draw_skills(frame: &mut Frame, area: Rect, app: &mut App) -> anyhow::Result<(
             &mut lines,
             #[allow(unstable_name_collisions)]
             skill
+                .keywords
+                .iter()
+                .map(|skill| Span::from(skill).bg(DARK_GRAY))
+                .intersperse(Span::from(", "))
+                .collect::<Line>(),
+        )?;
+    }
+
+    draw_scrollview(frame, area, &mut app.scroll_view_state, lines)?;
+
+    Ok(())
+}
+
+fn draw_languages(frame: &mut Frame, area: Rect, app: &mut App) -> anyhow::Result<()> {
+    let mut lines = Vec::new();
+
+    for language in app.resume.data.languages.iter() {
+        LineBuilder::new()
+            .bold()
+            .push_if_some(&mut lines, &language.language)?;
+        LineBuilder::new().push_if_some(&mut lines, &language.fluency)?;
+        LineBuilder::new().push_empty_line(&mut lines)?;
+    }
+
+    draw_scrollview(frame, area, &mut app.scroll_view_state, lines)?;
+
+    Ok(())
+}
+
+fn draw_interests(frame: &mut Frame, area: Rect, app: &mut App) -> anyhow::Result<()> {
+    let mut lines = Vec::new();
+
+    for interest in app.resume.data.interests.iter() {
+        LineBuilder::new()
+            .bold()
+            .push_if_some(&mut lines, &interest.name)?;
+        LineBuilder::new().newline().push_line(
+            &mut lines,
+            #[allow(unstable_name_collisions)]
+            interest
                 .keywords
                 .iter()
                 .map(|skill| Span::from(skill).bg(DARK_GRAY))
