@@ -76,6 +76,9 @@ fn draw_content(frame: &mut Frame, area: Rect, app: &mut App) -> anyhow::Result<
         PageType::Work => {
             draw_work(frame, content.inner(area), app).context("failed to draw work")?
         }
+        PageType::Education => {
+            draw_education(frame, content.inner(area), app).context("failed to draw education")?
+        }
         PageType::Portrait => draw_portrait(frame, content.inner(area), app)
             .context("failed to draw ascii portrait")?,
         _ => {}
@@ -159,14 +162,10 @@ fn draw_overview(frame: &mut Frame, area: Rect, app: &mut App) -> anyhow::Result
     let basics = app.resume.data.basics.as_ref().unwrap();
     let mut lines = Vec::new();
 
-    if let Some(name) = basics.name.as_ref() {
-        lines.push(Line::styled(name, Style::default().bold()));
-        lines.push(Line::default());
-    }
-
     LineBuilder::new()
-        .newline()
-        .push_if_some(&mut lines, &basics.summary)?;
+        .bold()
+        .push_if_some(&mut lines, &basics.name)?;
+    LineBuilder::new().push_if_some(&mut lines, &basics.summary)?;
 
     if let Some(location) = basics.location.as_ref() {
         let city = location.city.as_deref().unwrap_or("");
@@ -256,6 +255,35 @@ fn draw_work(frame: &mut Frame, area: Rect, app: &mut App) -> anyhow::Result<()>
                 .prefix("• ")
                 .push(&mut lines, highlight)?;
         }
+
+        LineBuilder::new().push_empty_line(&mut lines)?;
+    }
+
+    draw_scrollview(frame, area, &mut app.scroll_view_state, lines)?;
+
+    Ok(())
+}
+
+fn draw_education(frame: &mut Frame, area: Rect, app: &mut App) -> anyhow::Result<()> {
+    let mut lines = Vec::new();
+
+    for education_item in app.resume.data.education.iter() {
+        LineBuilder::new()
+            .bold()
+            .push_if_some(&mut lines, &education_item.institution)?;
+        LineBuilder::new()
+            .fg(Color::Gray)
+            .push_if_some(&mut lines, &education_item.area)?;
+        LineBuilder::new().fg(Color::Gray).push_if_some(
+            &mut lines,
+            &format_date_range(
+                education_item.start_date.as_ref(),
+                education_item.end_date.as_ref(),
+            ),
+        )?;
+
+        LineBuilder::new().push_empty_line(&mut lines)?;
+        LineBuilder::new().push_if_some(&mut lines, &education_item.study_type)?;
 
         LineBuilder::new().push_empty_line(&mut lines)?;
     }
