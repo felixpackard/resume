@@ -11,7 +11,7 @@ use ratatui::{
 };
 use tui_scrollview::{ScrollView, ScrollViewState, ScrollbarVisibility};
 
-use crate::{App, PageType, Shortcut};
+use crate::{date::format_date_range, App, PageType, Shortcut};
 
 const SIDEBAR_PADDING_LEFT: usize = 2;
 const CONTENT_PADDING_LEFT: usize = 3;
@@ -72,6 +72,9 @@ fn draw_content(frame: &mut Frame, area: Rect, app: &mut App) -> anyhow::Result<
     match app.pages.items[selected] {
         PageType::Overview => {
             draw_overview(frame, content.inner(area), app).context("failed to draw overview")?
+        }
+        PageType::Work => {
+            draw_work(frame, content.inner(area), app).context("failed to draw work")?
         }
         PageType::Portrait => draw_portrait(frame, content.inner(area), app)
             .context("failed to draw ascii portrait")?,
@@ -161,7 +164,9 @@ fn draw_overview(frame: &mut Frame, area: Rect, app: &mut App) -> anyhow::Result
         lines.push(Line::default());
     }
 
-    push_if_some(&mut lines, &basics.summary, "", true)?;
+    LineBuilder::new()
+        .newline()
+        .push_if_some(&mut lines, &basics.summary)?;
 
     if let Some(location) = basics.location.as_ref() {
         let city = location.city.as_deref().unwrap_or("");
@@ -175,13 +180,20 @@ fn draw_overview(frame: &mut Frame, area: Rect, app: &mut App) -> anyhow::Result
         };
 
         if !location_str.is_empty() {
-            lines.push(Line::from(format!("📌 {}", location_str)));
-            lines.push(Line::default());
+            LineBuilder::new()
+                .prefix("📌 ")
+                .newline()
+                .push_if_not_empty(&mut lines, &location_str)?;
         }
     }
 
-    push_if_some(&mut lines, &basics.email, "✉️ ", false)?;
-    push_if_some(&mut lines, &basics.phone, "☎️ ", true)?;
+    LineBuilder::new()
+        .prefix("✉️ ")
+        .push_if_some(&mut lines, &basics.email)?;
+    LineBuilder::new()
+        .prefix("☎️ ")
+        .newline()
+        .push_if_some(&mut lines, &basics.phone)?;
 
     basics.profiles.iter().for_each(|profile| {
         let network = profile.network.as_deref().unwrap_or("");
@@ -205,6 +217,48 @@ fn draw_overview(frame: &mut Frame, area: Rect, app: &mut App) -> anyhow::Result
             lines.push(Line::from(format!("{} {}", icon, profile_str)));
         }
     });
+
+    draw_scrollview(frame, area, &mut app.scroll_view_state, lines)?;
+
+    Ok(())
+}
+
+fn draw_work(frame: &mut Frame, area: Rect, app: &mut App) -> anyhow::Result<()> {
+    let mut lines = Vec::new();
+
+    for work_item in app.resume.data.work.iter() {
+        LineBuilder::new()
+            .bold()
+            .push_if_some(&mut lines, &work_item.name)?;
+        LineBuilder::new()
+            .fg(Color::Gray)
+            .newline()
+            .push_if_some(&mut lines, &work_item.description)?;
+        LineBuilder::new()
+            .bold()
+            .push_if_some(&mut lines, &work_item.position)?;
+
+        LineBuilder::new().fg(Color::Gray).push_if_some(
+            &mut lines,
+            &format_date_range(work_item.start_date.as_ref(), work_item.end_date.as_ref()),
+        )?;
+        LineBuilder::new()
+            .fg(Color::Gray)
+            .newline()
+            .push_if_some(&mut lines, &work_item.location)?;
+
+        LineBuilder::new()
+            .newline()
+            .push_if_some(&mut lines, &work_item.summary)?;
+
+        for highlight in &work_item.highlights {
+            LineBuilder::new()
+                .prefix("• ")
+                .push(&mut lines, highlight)?;
+        }
+
+        LineBuilder::new().push_empty_line(&mut lines)?;
+    }
 
     draw_scrollview(frame, area, &mut app.scroll_view_state, lines)?;
 
@@ -250,19 +304,68 @@ fn draw_portrait(frame: &mut Frame, area: Rect, app: &mut App) -> anyhow::Result
     Ok(())
 }
 
-fn push_if_some(
-    lines: &mut Vec<Line>,
-    opt: &Option<String>,
-    prefix: &str,
+struct LineBuilder {
+    prefix: String,
     push_newline: bool,
-) -> Result<(), anyhow::Error> {
-    if let Some(value) = opt {
-        lines.push(Line::from(format!("{}{}", prefix, value)));
-        if push_newline {
-            lines.push(Line::default());
+    style: Style,
+}
+
+impl LineBuilder {
+    fn new() -> Self {
+        Self {
+            prefix: String::new(),
+            push_newline: false,
+            style: Style::new(),
         }
     }
-    Ok(())
+
+    fn prefix(mut self, prefix: &str) -> Self {
+        self.prefix = prefix.to_string();
+        self
+    }
+
+    fn fg(mut self, color: Color) -> Self {
+        self.style = self.style.fg(color);
+        self
+    }
+
+    fn bold(mut self) -> Self {
+        self.style = self.style.bold();
+        self
+    }
+
+    fn newline(mut self) -> Self {
+        self.push_newline = true;
+        self
+    }
+
+    fn push(self, lines: &mut Vec<Line>, value: &String) -> anyhow::Result<()> {
+        let line = Line::from(format!("{}{}", self.prefix, value)).style(self.style);
+        lines.push(line);
+        if self.push_newline {
+            lines.push(Line::default());
+        }
+        Ok(())
+    }
+
+    fn push_if_some(self, lines: &mut Vec<Line>, opt: &Option<String>) -> anyhow::Result<()> {
+        if let Some(value) = opt {
+            self.push(lines, value)?;
+        }
+        Ok(())
+    }
+
+    fn push_if_not_empty(self, lines: &mut Vec<Line>, value: &String) -> anyhow::Result<()> {
+        if !value.is_empty() {
+            self.push(lines, value)?;
+        }
+        Ok(())
+    }
+
+    fn push_empty_line(self, lines: &mut Vec<Line>) -> anyhow::Result<()> {
+        lines.push(Line::default());
+        Ok(())
+    }
 }
 
 #[derive(Debug, Clone)]

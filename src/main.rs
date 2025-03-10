@@ -1,6 +1,7 @@
-use std::{fs::File, io, sync::Arc};
+use std::{fs::File, sync::Arc};
 
 use ::image::DynamicImage;
+use anyhow::Context;
 use image::fetch_image;
 use ratatui::{
     crossterm::event::{self, Event, KeyCode, KeyEvent, KeyEventKind, KeyModifiers},
@@ -12,18 +13,27 @@ use ratatui::{
 use tracing_subscriber::prelude::*;
 use tui_scrollview::ScrollViewState;
 
+pub mod date;
 pub mod image;
 pub mod json;
 pub mod ui;
 
 include!(concat!(env!("OUT_DIR"), "/codegen.rs"));
 
-fn main() -> io::Result<()> {
+fn main() -> anyhow::Result<()> {
     init_logging();
+    let resume = parse_resume()?;
     let mut terminal = ratatui::init();
-    let app_result = App::default().run(&mut terminal);
+    let app_result = App::new(resume).run(&mut terminal);
     ratatui::restore();
     app_result
+}
+
+fn parse_resume() -> anyhow::Result<ResumeSchema> {
+    let content =
+        std::fs::read_to_string("resume.json").context("failed to read resume file contents")?;
+    Ok(serde_json::from_str::<ResumeSchema>(&content)
+        .context("failed to parse resume to schema")?)
 }
 
 fn init_logging() {
@@ -125,6 +135,7 @@ impl PageType {
                 Shortcut::OpenBluesky,
                 Shortcut::OpenTwitter,
             ],
+            Self::Work => vec![Shortcut::OpenRigr, Shortcut::OpenPassle],
             _ => vec![],
         }
     }
@@ -137,6 +148,8 @@ enum Shortcut {
     OpenGithub,
     OpenBluesky,
     OpenTwitter,
+    OpenRigr,
+    OpenPassle,
 }
 
 impl Shortcut {
@@ -148,6 +161,8 @@ impl Shortcut {
             Self::OpenGithub => shortcut_line("github", 0),
             Self::OpenBluesky => shortcut_line("bluesky", 0),
             Self::OpenTwitter => shortcut_line("twitter", 0),
+            Self::OpenRigr => shortcut_line("rigr.gg", 0),
+            Self::OpenPassle => shortcut_line("passle", 0),
         }
     }
 
@@ -159,6 +174,8 @@ impl Shortcut {
             Self::OpenGithub => KeyCode::Char('g'),
             Self::OpenBluesky => KeyCode::Char('b'),
             Self::OpenTwitter => KeyCode::Char('t'),
+            Self::OpenRigr => KeyCode::Char('r'),
+            Self::OpenPassle => KeyCode::Char('p'),
         }
     }
 
@@ -169,6 +186,8 @@ impl Shortcut {
             Self::OpenGithub => open_url(app.resume.get_profile_url("github")),
             Self::OpenBluesky => open_url(app.resume.get_profile_url("bluesky")),
             Self::OpenTwitter => open_url(app.resume.get_profile_url("twitter")),
+            Self::OpenRigr => open_url(Some("https://rigr.gg".to_string())),
+            Self::OpenPassle => open_url(Some("https://home.passle.net".to_string())),
             _ => Ok(()),
         }
     }
@@ -232,11 +251,8 @@ impl From<&ResumeSchema> for Pages {
     }
 }
 
-impl Default for App {
-    fn default() -> Self {
-        let content = std::fs::read_to_string("resume.json").unwrap();
-        let resume = serde_json::from_str::<ResumeSchema>(&content).unwrap();
-
+impl App {
+    pub fn new(resume: ResumeSchema) -> Self {
         Self {
             should_exit: false,
             pages: Pages::from(&resume),
@@ -244,13 +260,14 @@ impl Default for App {
             scroll_view_state: ScrollViewState::default(),
         }
     }
-}
 
-impl App {
-    pub fn run(&mut self, terminal: &mut DefaultTerminal) -> io::Result<()> {
+    pub fn run(&mut self, terminal: &mut DefaultTerminal) -> anyhow::Result<()> {
         while !self.should_exit {
-            terminal.draw(|frame| self.draw(frame))?;
-            self.handle_events()?;
+            terminal
+                .draw(|frame| self.draw(frame))
+                .context("failed to draw frame to terminal backend")?;
+            self.handle_events()
+                .context("an error occurred while handling events")?;
         }
         Ok(())
     }
@@ -259,8 +276,8 @@ impl App {
         ui::draw(frame, self);
     }
 
-    fn handle_events(&mut self) -> io::Result<()> {
-        match event::read()? {
+    fn handle_events(&mut self) -> anyhow::Result<()> {
+        match event::read().context("failed to read key event")? {
             Event::Key(key) => {
                 self.handle_key(key);
             }
