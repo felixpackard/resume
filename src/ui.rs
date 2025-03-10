@@ -72,6 +72,9 @@ fn draw_content(frame: &mut Frame, area: Rect, app: &mut App) -> anyhow::Result<
         None => return Ok(()),
     };
     match app.pages.items[selected] {
+        PageType::Welcome => {
+            draw_welcome(frame, content.inner(area), app).context("failed to draw welcome")?
+        }
         PageType::Overview => {
             draw_overview(frame, content.inner(area), app).context("failed to draw overview")?
         }
@@ -92,7 +95,6 @@ fn draw_content(frame: &mut Frame, area: Rect, app: &mut App) -> anyhow::Result<
         }
         PageType::Portrait => draw_portrait(frame, content.inner(area), app)
             .context("failed to draw ascii portrait")?,
-        _ => {}
     };
 
     frame.render_widget(content, area);
@@ -169,14 +171,46 @@ fn draw_status_bar_shortcuts(
     Ok(())
 }
 
+fn draw_welcome(frame: &mut Frame, area: Rect, app: &mut App) -> anyhow::Result<()> {
+    let mut lines = Vec::new();
+
+    LineBuilder::new().bold().newline().push_string(
+        &mut lines,
+        &"Welcome to the CLI version of my resume!".to_string(),
+    )?;
+
+    for line in vec![
+        "Some pages contain external links. The keybinds to open these links are displayed in the bottom right corner of your terminal. For example, to view the source code of this CLI, you can press 's' while you're on this page.",
+        "",
+        "• To navigate between pages, use j/↓ k/↑",
+        "• To scroll page content, use alt+j/↓, alt+k/↑",
+        "• You may gracefully exit at any time by pressing 'q'",
+        "",
+        "Technical highlights:",
+        "",
+        "• This project uses the open source \"JSON Resume\" schema to parse my resume content from a JSON file and render it as an intuitive TUI",
+        "• The schema is transformed into Rust structs using the typify crate, and the TUI is rendered using ratatui",
+        "• Dates are parsed and formatted using a combination of chrono and date_component, with some custom parsing logic to handle the fact that the JSON Resume schema doesn't strictly adhere to the ISO 8601 format outlined in 3339",
+    ].iter() {
+        LineBuilder::new().push_string(&mut lines, &line.to_string())?;
+    }
+
+    draw_scrollview(frame, area, &mut app.scroll_view_state, lines)?;
+
+    Ok(())
+}
+
 fn draw_overview(frame: &mut Frame, area: Rect, app: &mut App) -> anyhow::Result<()> {
     let basics = app.resume.data.basics.as_ref().unwrap();
     let mut lines = Vec::new();
 
     LineBuilder::new()
         .bold()
+        .newline()
         .push_if_some(&mut lines, &basics.name)?;
-    LineBuilder::new().push_if_some(&mut lines, &basics.summary)?;
+    LineBuilder::new()
+        .newline()
+        .push_if_some(&mut lines, &basics.summary)?;
 
     if let Some(location) = basics.location.as_ref() {
         let city = location.city.as_deref().unwrap_or("");

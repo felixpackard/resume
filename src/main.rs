@@ -104,6 +104,7 @@ impl Resume {
 
 #[derive(Debug, Clone, Copy)]
 enum PageType {
+    Welcome,
     Overview,
     Work,
     Education,
@@ -116,6 +117,7 @@ enum PageType {
 impl PageType {
     fn label(&self) -> &str {
         match self {
+            Self::Welcome => "Welcome",
             Self::Overview => "Overview",
             Self::Work => "Work",
             Self::Education => "Education",
@@ -128,6 +130,7 @@ impl PageType {
 
     fn shortcuts(&self) -> Vec<Shortcut> {
         match self {
+            Self::Welcome => vec![Shortcut::OpenSource],
             Self::Overview => vec![
                 Shortcut::OpenEmail,
                 Shortcut::OpenPhone,
@@ -143,6 +146,7 @@ impl PageType {
 
 enum Shortcut {
     Quit,
+    OpenSource,
     OpenEmail,
     OpenPhone,
     OpenGithub,
@@ -156,6 +160,7 @@ impl Shortcut {
     fn label(&self) -> Line {
         match self {
             Self::Quit => shortcut_line("quit", 0),
+            Self::OpenSource => shortcut_line("source", 0),
             Self::OpenEmail => shortcut_line("email", 0),
             Self::OpenPhone => shortcut_line("phone", 0),
             Self::OpenGithub => shortcut_line("github", 0),
@@ -169,6 +174,7 @@ impl Shortcut {
     fn key(&self) -> KeyCode {
         match self {
             Self::Quit => KeyCode::Char('q'),
+            Self::OpenSource => KeyCode::Char('s'),
             Self::OpenEmail => KeyCode::Char('e'),
             Self::OpenPhone => KeyCode::Char('p'),
             Self::OpenGithub => KeyCode::Char('g'),
@@ -181,6 +187,10 @@ impl Shortcut {
 
     fn handle(&self, app: &mut App) -> std::io::Result<()> {
         match self {
+            Shortcut::Quit => Ok(()), // The quit shortcut is handled in the `handle_key` method
+            Self::OpenSource => {
+                open_url(Some("https://github.com/felixpackard/resume".to_string()))
+            }
             Self::OpenEmail => open_url(app.resume.get_email_url()),
             Self::OpenPhone => open_url(app.resume.get_phone_url()),
             Self::OpenGithub => open_url(app.resume.get_profile_url("github")),
@@ -188,7 +198,6 @@ impl Shortcut {
             Self::OpenTwitter => open_url(app.resume.get_profile_url("twitter")),
             Self::OpenRigr => open_url(Some("https://rigr.gg".to_string())),
             Self::OpenPassle => open_url(Some("https://home.passle.net".to_string())),
-            _ => Ok(()),
         }
     }
 }
@@ -225,6 +234,7 @@ impl From<&ResumeSchema> for Pages {
         let mut items: Vec<PageType> = Vec::new();
 
         let sections = [
+            (true, PageType::Welcome),
             (resume.basics.is_some(), PageType::Overview),
             (!resume.work.is_empty(), PageType::Work),
             (!resume.education.is_empty(), PageType::Education),
