@@ -9,7 +9,7 @@ This repository contains my resume in JSON format, following the open source [JS
 
 ## Features
 - [Bespoke CLI resume viewer](./packages/cli) written in Rust with navigation, custom date parsing/formatting logic, and external links
-- [Web-based resume](./packages/web) using Bun, [resumed](https://github.com/rbardini/resumed) and [jsonresume-theme-even](https://github.com/rbardini/jsonresume-theme-even/tree/main)
+- [Web-based resume](./packages/web) using Bun, [resumed](https://github.com/rbardini/resumed) and and custom fork of [jsonresume-theme-onepage-plus](https://github.com/felixpackard/jsonresume-theme-onepage-plus)
 
 ## Quick Start
 
