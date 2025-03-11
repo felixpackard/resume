@@ -18,6 +18,11 @@
                 "url": "https://github.com/felixpackard"
             },
             {
+                "network": "LinkedIn",
+                "username": "Felix Packard",
+                "url": "https://www.linkedin.com/in/felix-p-194b91127/"
+            },
+            {
                 "network": "Bluesky",
                 "username": "felixpackard.dev",
                 "url": "https://bsky.app/profile/felixpackard.dev"
@@ -211,6 +216,6 @@
         "canonical": "https://raw.githubusercontent.com/jsonresume/resume-schema/v1.0.0/sample.resume.json",
         "version": "v1.0.0",
         "lastModified": "2017-12-24T15:53:00",
-        "theme": "jsonresume-theme-even"
+        "theme": "jsonresume-theme-onepage-plus"
     }
 }

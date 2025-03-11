@@ -3,7 +3,8 @@
     "module": "index.ts",
     "type": "module",
     "scripts": {
-        "build": "resumed render",
+        "build": "resumed render --theme jsonresume-theme-onepage-plus",
+        "pdf": "bun scripts/pdf.js",
         "watch": "nodemon --watch resume.json --exec bun run render"
     },
     "devDependencies": {
@@ -13,8 +14,9 @@
         "typescript": "^5.0.0"
     },
     "dependencies": {
-        "jsonresume-theme-even": "^0.23.0",
+        "jsonresume-theme-onepage-plus": "github:felixpackard/jsonresume-theme-onepage-plus",
         "nodemon": "^3.1.7",
+        "puppeteer": "^24.4.0",
         "resumed": "^4.0.0"
     }
 }
