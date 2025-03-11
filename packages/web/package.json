@@ -1,0 +1,20 @@
+{
+    "name": "resume-web",
+    "module": "index.ts",
+    "type": "module",
+    "scripts": {
+        "build": "resumed render",
+        "watch": "nodemon --watch resume.json --exec bun run render"
+    },
+    "devDependencies": {
+        "bun-types": "latest"
+    },
+    "peerDependencies": {
+        "typescript": "^5.0.0"
+    },
+    "dependencies": {
+        "jsonresume-theme-even": "^0.23.0",
+        "nodemon": "^3.1.7",
+        "resumed": "^4.0.0"
+    }
+}

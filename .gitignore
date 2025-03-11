@@ -1,2 +1,4 @@
-/target
+/packages/**/resume.json
+/packages/**/schema.json
+
 *.log
